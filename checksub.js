@@ -1,0 +1,318 @@
+const axios = require('axios').default;
+
+// Helper function untuk XOR (SAMA PERSIS)
+function xor(text, key = 5) {
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+        result += String.fromCharCode(text.charCodeAt(i) ^ key);
+    }
+    return result;
+}
+
+async function checkTeamDuration(email, password, agent) {
+    const encryptedEmail = Buffer.from(xor(email)).toString('hex');
+    const encryptedPassword = Buffer.from(xor(password)).toString('hex');
+
+    // 1. LOGIN MOBILE ENDPOINT (Identik dengan paw.js)
+    const loginOptions = {
+        method: 'POST',
+        url: 'https://passport16-normal-us-ttp.capcutapi.us/passport/email/login/',
+        params: {
+            'passport-sdk-version': '6034190',
+            iid: '7595626470614042384',
+            device_id: '7593759834610615816',
+            ac: 'wifi',
+            channel: 'googleplay',
+            aid: '3006',
+            app_name: 'vicut',
+            version_code: '16401600',
+            version_name: '16.4.0',
+            device_platform: 'android',
+            os: 'android',
+            ssmix: 'a',
+            device_type: 'Pixel 5',
+            device_brand: 'google',
+            language: 'en',
+            os_api: '30',
+            os_version: '11',
+            openudid: 'e932e2818d5f3084',
+            manifest_version_code: '16401600',
+            resolution: '1080*2142',
+            dpi: '420',
+            update_version_code: '16401600',
+            _rticket: '1768911186619',
+            region: 'ID',
+            cdid: 'c20c788f-9fd9-4dff-9731-1c956b122928',
+            effect_sdk_version: '20.7.0',
+            subdivision_id: '0',
+            user_type: 'personal_user'
+        },
+        headers: {
+            host: 'passport16-normal-us-ttp.capcutapi.us',
+            connection: 'keep-alive',
+            lan: 'en',
+            loc: 'ID',
+            pf: '0',
+            vr: '285229056',
+            appvr: '16.4.0',
+            vc: '16401600',
+            'device-time': '1768911186',
+            tdid: '7593759834610615816',
+            'sign-ver': '1',
+            sign: '293f7b500cedca42673114f2316a835e',
+            'app-sdk-version': '157.0.0',
+            appid: '3006',
+            'header-content': '/login/|0|16.4.0|1768911186|7593759834610615816',
+            'host-abi': '64',
+            'cc-newuser-channel': 'common',
+            'cache-control': 'no-cache',
+            sysvr: '30',
+            ch: 'googleplay',
+            uid: '0',
+            compressed: '1',
+            did: '00000000-2e5b-b679-ffff-ffffef05ac4a',
+            model: 'UGl4ZWwgNQ==',
+            manu: 'R29vZ2xl',
+            gpurender: 'QWRyZW5vIChUTSkgNTEy',
+            'hdr-tdid': '7593759834610615816',
+            'hdr-tiid': '7595626470614042384',
+            'hdr-device-time': '1768911186',
+            version_code: '285229056',
+            'hdr-sign': '51fe9560f69f12e3f5ffaf3245812dad',
+            'hdr-sign-ver': '1',
+            'x-tt-passport-csrf-token': '9526a310be8c39296fe811e5429e5cc9',
+            'x-ss-req-ticket': '1768911186620',
+            'commerce-sign-version': 'v1',
+            'x-vc-bdturing-sdk-version': '2.3.10.i18n',
+            'sdk-version': '2',
+            'passport-sdk-version': '-1',
+            'x-tt-bypass-dp': '1',
+            store_region: 'US',
+            region: 'ID',
+            'x-tt-pba-enable': '1',
+            'store-country-code': 'us',
+            'is-dispatch-us-ttp': '1',
+            'store-country-code-src': 'did',
+            'x-sandbox-source-host': 'passport16-normal-us-ttp.capcutapi.us',
+            'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'user-agent': 'com.lemon.lvoverseas/16401600 (Linux; U; Android 11; en_US; Pixel 5; Build/RQ3A.210905.001; Cronet/TTNetVersion:b1e0903d 2025-07-02 QuicVersion:d7dd7399 2025-07-01)',
+            'accept-encoding': 'gzip, deflate, br'
+        },
+        data: `password=${encryptedPassword}&account_sdk_source=app&email=${encryptedEmail}&mix_mode=1&iid=7595626470614042384&device_id=7593759834610615816&ac=wifi&channel=googleplay&aid=3006&app_name=vicut&version_code=16401600&version_name=16.4.0&device_platform=android&os=android&ssmix=a&device_type=Pixel+5&device_brand=google&language=en&os_api=30&os_version=11&openudid=e932e2818d5f3084&manifest_version_code=16401600&resolution=1080*2142&dpi=420&update_version_code=16401600&_rticket=1768911186616&region=ID&cdid=c20c788f-9fd9-4dff-9731-1c956b122928`,
+        httpsAgent: agent
+    };
+
+    const { data, headers } = await axios.request(loginOptions);
+    if (data.message !== 'success') throw new Error(data?.data?.description || data?.message || 'Login failed');
+
+    const setCookieHeader = headers['set-cookie'] || headers['Set-Cookie'];
+    const sessionCookie = setCookieHeader.find(c => c.includes('sessionid='));
+    const sessionId = sessionCookie.split(';')[0];
+    const sessionValue = sessionId.split('=')[1];
+
+    // 2. GET WORKSPACE (Identik dengan paw.js)
+    const wsOptions = {
+        method: 'POST',
+        url: 'https://feed16-normal-us-ttp.capcutapi.us/cc/v1/workspace/get_user_workspaces',
+        params: {
+            iid: '7595626470614042384',
+            device_id: '7593759834610615816',
+            ac: 'wifi',
+            channel: 'googleplay',
+            aid: '3006',
+            app_name: 'vicut',
+            version_code: '16401600',
+            version_name: '16.4.0',
+            device_platform: 'android',
+            os: 'android',
+            ssmix: 'a',
+            device_type: 'Pixel 5',
+            device_brand: 'google',
+            language: 'en',
+            os_api: '30',
+            os_version: '11',
+            openudid: 'e932e2818d5f3084',
+            manifest_version_code: '16401600',
+            resolution: '1080*2142',
+            dpi: '420',
+            update_version_code: '16401600',
+            _rticket: '1768911222199',
+            region: 'ID',
+            cdid: 'c20c788f-9fd9-4dff-9731-1c956b122928',
+            effect_sdk_version: '20.7.0',
+            subdivision_id: '0',
+            user_type: 'personal_user'
+        },
+        headers: {
+            host: 'feed16-normal-us-ttp.capcutapi.us',
+            connection: 'keep-alive',
+            lan: 'en',
+            loc: 'ID',
+            pf: '0',
+            vr: '285229056',
+            appvr: '16.4.0',
+            vc: '16401600',
+            'device-time': '1768911222',
+            tdid: '7593759834610615816',
+            'sign-ver': '1',
+            sign: '0ec042745848bf519b5b93865637a7b5',
+            'app-sdk-version': '157.0.0',
+            appid: '3006',
+            'header-content': 'kspaces|0|16.4.0|1768911222|7593759834610615816',
+            'host-abi': '64',
+            'cc-newuser-channel': 'common',
+            'cache-control': 'no-cache',
+            sysvr: '30',
+            ch: 'googleplay',
+            uid: '7595423788197643277',
+            compressed: '1',
+            did: '00000000-2e5b-b679-ffff-ffffef05ac4a',
+            model: 'UGl4ZWwgNQ==',
+            manu: 'R29vZ2xl',
+            gpurender: 'QWRyZW5vIChUTSkgNTEy',
+            'hdr-tdid': '7593759834610615816',
+            'hdr-tiid': '7595626470614042384',
+            'hdr-device-time': '1768911222',
+            version_code: '285229056',
+            'hdr-sign': 'c4e7e31c9426fe46da0e82c65d6ad876',
+            'hdr-sign-ver': '1',
+            'x-ss-req-ticket': '1768911222200',
+            'commerce-sign-version': 'v1',
+            'x-vc-bdturing-sdk-version': '2.3.10.i18n',
+            'sdk-version': '2',
+            'passport-sdk-version': '-1',
+            store_region: 'US',
+            region: 'ID',
+            'x-tt-pba-enable': '1',
+            'store-country-code': 'us',
+            'is-dispatch-us-ttp': '1',
+            'store-country-code-src': 'uid',
+            'x-sandbox-source-host': 'feed-api.capcutapi.com',
+            'content-type': 'application/json; charset=utf-8',
+            'x-ss-dp': '3006',
+            'user-agent': 'com.lemon.lvoverseas/16401600 (Linux; U; Android 11; en_US; Pixel 5; Build/RQ3A.210905.001; Cronet/TTNetVersion:b1e0903d 2025-07-02 QuicVersion:d7dd7399 2025-07-01)',
+            'accept-encoding': 'gzip, deflate, br',
+            'cookie': `sessionid=${sessionValue}`
+        },
+        data: {
+            "count": 100,
+            "cursor": "",
+            "need_convert_workspace": true
+        },
+        httpsAgent: agent
+    };
+
+    const wsResponse = await axios.request(wsOptions);
+    if (wsResponse.data.ret !== '0' || !wsResponse.data.data.workspace_infos || wsResponse.data.data.workspace_infos.length === 0) {
+        throw new Error('Tidak ada workspace ditemukan');
+    }
+
+    const workspaceId = wsResponse.data.data.workspace_infos[0].workspace_id;
+
+    // 3. GET SUBSCRIPTION (Identik dengan paw.js)
+    const subOptions = {
+        method: 'POST',
+        url: 'https://commerce16-normal-us-ttp.capcutapi.us/commerce/v1/subscription/get_subscribe_info',
+        params: {
+            iid: '7595626470614042384',
+            device_id: '7593759834610615816',
+            ac: 'wifi',
+            channel: 'googleplay',
+            aid: '3006',
+            app_name: 'vicut',
+            version_code: '16401600',
+            version_name: '16.4.0',
+            device_platform: 'android',
+            os: 'android',
+            ssmix: 'a',
+            device_type: 'Pixel 5',
+            device_brand: 'google',
+            language: 'en',
+            os_api: '30',
+            os_version: '11',
+            openudid: 'e932e2818d5f3084',
+            manifest_version_code: '16401600',
+            resolution: '1080*2142',
+            dpi: '420',
+            update_version_code: '16401600',
+            _rticket: '1768911226985',
+            region: 'ID',
+            cdid: 'c20c788f-9fd9-4dff-9731-1c956b122928',
+            effect_sdk_version: '20.7.0',
+            subdivision_id: '0',
+            user_type: 'personal_user'
+        },
+        headers: {
+            host: 'commerce16-normal-us-ttp.capcutapi.us',
+            connection: 'keep-alive',
+            lan: 'en',
+            loc: 'ID',
+            pf: '0',
+            vr: '285229056',
+            appvr: '16.4.0',
+            vc: '16401600',
+            'device-time': '1768911227',
+            tdid: '7593759834610615816',
+            'sign-ver': '1',
+            sign: 'eba98caea0a91c767bf5c84b1128d4a4',
+            'app-sdk-version': '157.0.0',
+            appid: '3006',
+            'header-content': 'be_info|0|16.4.0|1768911227|7593759834610615816',
+            'host-abi': '64',
+            'cc-newuser-channel': 'common',
+            'cache-control': 'no-cache',
+            sysvr: '30',
+            ch: 'googleplay',
+            uid: '7595423788197643277',
+            compressed: '1',
+            did: '00000000-2e5b-b679-ffff-ffffef05ac4a',
+            model: 'UGl4ZWwgNQ==',
+            manu: 'R29vZ2xl',
+            gpurender: 'QWRyZW5vIChUTSkgNTEy',
+            'hdr-tdid': '7593759834610615816',
+            'hdr-tiid': '7595626470614042384',
+            'hdr-device-time': '1768911226',
+            version_code: '285229056',
+            'hdr-sign': '1c1bd4840471e066e4ff8254125f7018',
+            'hdr-sign-ver': '1',
+            'x-ss-req-ticket': '1768911226985',
+            'commerce-sign-version': 'v1',
+            'x-vc-bdturing-sdk-version': '2.3.10.i18n',
+            'sdk-version': '2',
+            'passport-sdk-version': '-1',
+            'x-tt-pba-enable': '1',
+            'store-country-code': 'us',
+            'is-dispatch-us-ttp': '1',
+            'store-country-code-src': 'uid',
+            'x-sandbox-source-host': 'commerce-api.capcutapi.com',
+            store_region: 'US',
+            region: 'ID',
+            'content-type': 'application/json; charset=utf-8',
+            'x-ss-dp': '3006',
+            'user-agent': 'com.lemon.lvoverseas/16401600 (Linux; U; Android 11; en_US; Pixel 5; Build/RQ3A.210905.001; Cronet/TTNetVersion:b1e0903d 2025-07-02 QuicVersion:d7dd7399 2025-07-01)',
+            'accept-encoding': 'gzip, deflate, br',
+            'cookie': `sessionid=${sessionValue}`
+        },
+        data: {
+            "scenes": ["teams"],
+            "language": "en",
+            "workspace_ids": [workspaceId]
+        },
+        httpsAgent: agent
+    };
+
+    const subResponse = await axios.request(subOptions);
+    if (subResponse.data.ret === '0' && subResponse.data.data.workspace_subscribe_list && subResponse.data.data.workspace_subscribe_list.length > 0) {
+        const workspaceInfo = subResponse.data.data.workspace_subscribe_list[0];
+        const vipFinalEnd = workspaceInfo.vip_final_end;
+        const currentTime = Math.floor(Date.now() / 1000);
+        return {
+            workspaceName: workspaceInfo.workspace_name,
+            daysRemaining: Math.floor((vipFinalEnd - currentTime) / (60 * 60 * 24))
+        };
+    } else {
+        throw new Error(subResponse.data.errmsg || 'Gagal mendapatkan info subscription');
+    }
+}
+
+module.exports = { checkTeamDuration };
