@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CapCut Manager - Professional Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#111827',
+                            card: '#1f2937',
+                            border: '#374151',
+                            primary: '#2563eb',
+                            accent: '#10b981',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+        .processing-card { animation: pulse-blue 2s infinite; border-color: #2563eb !important; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-link.active { background: rgba(37, 99, 235, 0.1); border-color: #2563eb; color: white; }
+
+        .terminal-mini {
+            background: #000;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: #10b981;
+            padding: 10px;
+            border-radius: 8px;
+            height: 100px;
+            overflow-y: auto;
+            border: 1px solid #374151;
+        }
+        .terminal-line::before { content: "> "; color: #3b82f6; }
+        
+        #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column-reverse; gap: 8px; }
+        
+        #notificationDropdown.hidden { display: none; }
+        #notificationDropdown { animation: fadeIn 0.2s ease-out; }
+    </style>
+</head>
+<body class="bg-brand-dark text-gray-100 min-h-screen flex flex-col">
+
+    <audio id="successSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <header class="border-b border-brand-border bg-brand-dark sticky top-0 z-50">
+        <div class="max-w-[90rem] mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-brand-primary rounded-xl text-white">
+                    <i data-lucide="zap" class="w-7 h-7"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-white tracking-tight">CapCut Manager</h1>
+                    <p class="text-sm text-gray-400">Automated Team Workspace Joiner</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div id="connectionStatus" class="flex items-center gap-2 px-4 py-2 bg-brand-border rounded-full text-[10px] font-bold text-white">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-accent opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-accent"></span>
+                    </span>
+                    SYNC: <span id="lastSyncTime" class="text-brand-accent font-mono">LIVE</span>
+                </div>
+
+                <div class="relative">
+                    <button onclick="toggleNotificationDropdown()" class="relative p-2 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition">
+                        <i data-lucide="bell" class="w-6 h-6"></i>
+                        <span id="bellBadge" class="hidden absolute top-2 right-2 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-brand-dark animate-pulse"></span>
+                    </button>
+
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-3 w-80 bg-brand-card border border-brand-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+                        <div class="p-4 border-b border-brand-border flex items-center justify-between bg-white/5">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Link Expiry Alerts</h3>
+                            <span id="alertCountLabel" class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="expiryAlertList" class="max-h-64 overflow-y-auto p-2 space-y-1 bg-brand-dark/30">
+                            <p id="emptyAlertText" class="text-center py-8 text-gray-600 text-[11px] italic">No urgent alerts found.</p>
+                        </div>
+                        <div class="p-2.5 border-t border-brand-border text-center">
+                            <p class="text-[9px] text-gray-500">Links are active for 7 days since creation.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[90rem] mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-4 gap-8 flex-grow">
+        
+        <div class="lg:col-span-1 space-y-4">
+            <div class="bg-brand-card rounded-2xl border border-brand-border p-2 shadow-xl">
+                <p class="text-[10px] font-bold text-gray-500 px-4 py-3 uppercase tracking-widest">Navigation</p>
+                <nav class="space-y-1">
+                    <button onclick="switchTab('activity')" id="nav-activity" class="nav-link active w-full flex items-center justify-between px-4 py-3 rounded-xl border border-transparent hover:bg-white/5 transition text-sm font-semibold text-gray-400">
+                        <div class="flex items-center gap-3"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Activity Monitor</div>
+                    </button>
+                    <button onclick="switchTab('capcut')" id="nav-capcut" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-xl border border-transparent hover:bg-white/5 transition text-sm font-semibold text-gray-400">
+                        <div class="flex items-center gap-3"><i data-lucide="user-plus" class="w-4 h-4"></i> CapCut Joiner</div>
+                    </button>
+                    <button onclick="switchTab('checksub')" id="nav-checksub" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-xl border border-transparent hover:bg-white/5 transition text-sm font-semibold text-gray-400">
+                        <div class="flex items-center gap-3"><i data-lucide="clock" class="w-4 h-4"></i> Check Duration</div>
+                    </button>
+                    <button onclick="switchTab('domains')" id="nav-domains" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-xl border border-transparent hover:bg-white/5 transition text-sm font-semibold text-gray-400">
+                        <div class="flex items-center gap-3"><i data-lucide="globe" class="w-4 h-4"></i> Manage Domains</div>
+                        <span id="domainCount" class="text-[10px] bg-brand-dark px-2 py-0.5 rounded-full border border-brand-border">0</span>
+                    </button>
+                    <button onclick="switchTab('database')" id="nav-database" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-xl border border-transparent hover:bg-white/5 transition text-sm font-semibold text-gray-400">
+                        <div class="flex items-center gap-3"><i data-lucide="database" class="w-4 h-4"></i> Database Center</div>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="bg-brand-card p-6 rounded-2xl border border-brand-border shadow-xl">
+                <h2 class="text-sm font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-tight">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-brand-primary"></i> AUTO CREATE + JOIN DISINI
+                </h2>
+                <div class="space-y-4">
+                    <input id="link" type="text" class="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-brand-primary" placeholder="Paste link...">
+                    <div class="grid grid-cols-2 gap-3">
+                        <input id="count" type="number" value="1" class="bg-brand-dark border border-brand-border rounded-xl p-3 text-xs text-center">
+                        <input id="pw" type="text" value="masuk123" class="bg-brand-dark border border-brand-border rounded-xl p-3 text-xs text-center font-mono">
+                    </div>
+                    <button id="launchBtn" onclick="startJob()" class="w-full bg-brand-primary hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition text-xs">
+                        LAUNCH TASK
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 space-y-6">
+            
+            <div id="stats-overview" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-brand-card border border-brand-border p-5 rounded-2xl shadow-lg group hover:border-brand-primary transition">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Total Accounts</p>
+                    <div class="flex items-end justify-between">
+                        <h3 id="stat-total" class="text-3xl font-bold text-white">0</h3>
+                        <i data-lucide="database" class="w-8 h-8 text-brand-primary opacity-20 group-hover:opacity-100 transition"></i>
+                    </div>
+                </div>
+                <div class="bg-brand-card border border-brand-border p-5 rounded-2xl shadow-lg group hover:border-brand-accent transition">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Active Tasks</p>
+                    <div class="flex items-end justify-between">
+                        <h3 id="stat-active" class="text-3xl font-bold text-brand-accent">0</h3>
+                        <i data-lucide="zap" class="w-8 h-8 text-brand-accent opacity-20 group-hover:opacity-100 transition"></i>
+                    </div>
+                </div>
+                <div class="bg-brand-card border border-brand-border p-5 rounded-2xl shadow-lg group hover:border-blue-400 transition">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Success Rate</p>
+                    <div class="flex items-end justify-between">
+                        <h3 id="stat-rate" class="text-3xl font-bold text-white">0%</h3>
+                        <i data-lucide="bar-chart-3" class="w-8 h-8 text-blue-400 opacity-20 group-hover:opacity-100 transition"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-activity" class="tab-content active space-y-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                        <i data-lucide="activity" class="w-7 h-7 text-brand-primary"></i> Live Activity Monitor
+                    </h2>
+                    <button onclick="loadHistory()" class="text-sm text-gray-400 hover:text-white transition flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Sync
+                    </button>
+                </div>
+                <div id="historyList" class="space-y-4"></div>
+            </div>
+
+            <div id="tab-capcut" class="tab-content space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">CapCut Joiner Center</h2>
+                        <p class="text-sm text-gray-500">Pilih metode join (Satuan atau Bulk).</p>
+                    </div>
+                    <div class="flex bg-brand-dark p-1 rounded-xl border border-brand-border">
+                        <button onclick="toggleCapcutMethod('single')" id="btn-cap-single" class="px-4 py-2 text-[10px] font-bold rounded-lg bg-brand-primary text-white transition">SINGLE</button>
+                        <button onclick="toggleCapcutMethod('bulk')" id="btn-cap-bulk" class="px-4 py-2 text-[10px] font-bold rounded-lg text-gray-500 hover:text-white transition">BULK JOIN</button>
+                    </div>
+                </div>
+
+                <div id="capcut-single-form" class="bg-brand-card p-8 rounded-2xl border border-brand-border shadow-xl max-w-2xl">
+                    <div class="space-y-5">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">CapCut Email</label>
+                            <input id="capcut-email" type="email" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition" placeholder="email@capcut.com">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">Password</label>
+                            <input id="capcut-password" type="text" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition font-mono" placeholder="Password">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">Invite Link</label>
+                            <input id="capcut-invite-single" type="text" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition" placeholder="https://www.capcut.com/t/XXXXXX/">
+                        </div>
+                        <button id="capcutBtn" onclick="startCapcutJoin()" class="w-full bg-brand-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
+                            START JOIN PROCESS
+                        </button>
+                    </div>
+                </div>
+
+                <div id="capcut-bulk-form" class="hidden bg-brand-card p-8 rounded-2xl border border-brand-border shadow-xl max-w-2xl">
+                    <div class="space-y-5">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">Bulk Accounts (email|password)</label>
+                            <textarea id="capcut-bulk-data" rows="6" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-xs font-mono outline-none focus:ring-2 focus:ring-brand-primary transition" placeholder="akun1@gmail.com|pass123&#10;akun2@gmail.com|pass456"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">Invite Link</label>
+                            <input id="capcut-invite-bulk" type="text" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition" placeholder="https://www.capcut.com/t/XXXXXX/">
+                        </div>
+                        <button id="capcutBulkBtn" onclick="startCapcutBulk()" class="w-full bg-brand-accent hover:bg-emerald-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
+                            RUN BULK JOINER
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-checksub" class="tab-content space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Check Duration Team</h2>
+                    <p class="text-sm text-gray-500">Cek masa berlaku subscription team workspace secara real-time.</p>
+                </div>
+                <div class="bg-brand-card p-8 rounded-2xl border border-brand-border shadow-xl max-w-2xl">
+                    <div class="space-y-5">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">CapCut Email</label>
+                            <input id="check-email" type="email" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition" placeholder="email@capcut.com">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-widest">Password</label>
+                            <input id="check-password" type="text" class="w-full bg-brand-dark border border-brand-border rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-brand-primary transition font-mono" placeholder="Password">
+                        </div>
+                        <button id="checkSubBtn" onclick="startCheckDuration()" class="w-full bg-brand-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl transition shadow-lg">
+                            CHECK SUBSCRIPTION
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-domains" class="tab-content space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Manage Domains</h2>
+                    <p class="text-sm text-gray-500">Add or remove email domains for automation.</p>
+                </div>
+                <div class="bg-brand-card p-6 rounded-2xl border border-brand-border shadow-xl">
+                    <div class="flex gap-3 mb-8">
+                        <input id="newDomain" type="text" placeholder="e.g., example.com" class="flex-1 bg-brand-dark border border-brand-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-primary transition">
+                        <button onclick="addDomain()" class="bg-brand-primary px-8 rounded-xl font-bold text-white hover:bg-blue-600 transition">Add Domain</button>
+                    </div>
+                    <div id="domainPageList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+            </div>
+
+            <div id="tab-database" class="tab-content space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Database Center</h2>
+                        <p class="text-sm text-gray-500">View and manage all generated accounts by link.</p>
+                    </div>
+                    <div class="relative w-72">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                        <input id="dbSearch" type="text" oninput="updateDatabaseView()" placeholder="Filter by link..." class="w-full bg-brand-dark border border-brand-border rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:ring-1 focus:ring-brand-primary">
+                    </div>
+                </div>
+                <div id="databasePageContent" class="space-y-6"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="mt-auto py-8 border-t border-brand-border bg-brand-dark/50">
+        <div class="max-w-[90rem] mx-auto px-6 text-center">
+            <p class="text-gray-500 text-xs font-bold uppercase tracking-[0.2em] mb-2">Created by <span class="text-brand-primary">@eatmin</span></p>
+            <p class="text-gray-400 text-[10px] italic font-medium">"JANGAN DI JUAL YA BANG, CAPEK BIKINNYA"</p>
+        </div>
+    </footer>
+
+    <div id="toast-container"></div>
+
+    <script>
+        lucide.createIcons();
+        let expandedTasks = new Set();
+        let lastTaskStates = {};
+        let isDropdownOpen = false;
+
+        // PAGINATION & GROUPING STATE
+        let dbCurrentPage = 1;
+        const dbItemsPerPage = 3; 
+
+        function toggleCapcutMethod(method) {
+            const singleForm = document.getElementById('capcut-single-form');
+            const bulkForm = document.getElementById('capcut-bulk-form');
+            const btnSingle = document.getElementById('btn-cap-single');
+            const btnBulk = document.getElementById('btn-cap-bulk');
+
+            if (method === 'single') {
+                singleForm.classList.remove('hidden');
+                bulkForm.classList.add('hidden');
+                btnSingle.classList.add('bg-brand-primary', 'text-white');
+                btnBulk.classList.remove('bg-brand-primary', 'text-white');
+                btnBulk.classList.add('text-gray-500');
+            } else {
+                singleForm.classList.add('hidden');
+                bulkForm.classList.remove('hidden');
+                btnBulk.classList.add('bg-brand-primary', 'text-white');
+                btnSingle.classList.remove('bg-brand-primary', 'text-white');
+                btnSingle.classList.add('text-gray-500');
+            }
+        }
+
+        function getRemainingDays(timestamp) {
+            const createdDate = new Date(timestamp);
+            const expiryDate = new Date(createdDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+            const now = new Date();
+            const diffTime = expiryDate - now;
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function toggleNotificationDropdown() {
+            const dropdown = document.getElementById('notificationDropdown');
+            isDropdownOpen = !isDropdownOpen;
+            dropdown.classList.toggle('hidden', !isDropdownOpen);
+        }
+
+        window.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('notificationDropdown');
+            const bellBtn = dropdown?.previousElementSibling;
+            if (dropdown && !dropdown.contains(e.target) && !bellBtn?.contains(e.target)) {
+                isDropdownOpen = false;
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        function updateExpiryNotifications(data) {
+            const badge = document.getElementById('bellBadge');
+            const list = document.getElementById('expiryAlertList');
+            const countLabel = document.getElementById('alertCountLabel');
+            const emptyText = document.getElementById('emptyAlertText');
+            
+            const uniqueLinks = [...new Map(data.map(item => [item.link, item])).values()];
+            let urgentCount = 0;
+            
+            if (list) {
+                list.innerHTML = '';
+                uniqueLinks.forEach(job => {
+                    if(!job.link) return;
+                    const remaining = getRemainingDays(job.timestamp);
+                    if (remaining <= 1) {
+                        urgentCount++;
+                        const isExpired = remaining <= 0;
+                        const item = document.createElement('div');
+                        item.className = `p-3 rounded-xl border border-white/5 flex items-center gap-3 transition hover:bg-white/5 cursor-pointer ${isExpired ? 'bg-red-500/10' : 'bg-orange-500/10'}`;
+                        item.innerHTML = `
+                            <div class="p-2 rounded-lg bg-brand-dark/50 ${isExpired ? 'text-red-500' : 'text-orange-400'}">
+                                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[10px] font-bold text-white truncate">${job.link}</p>
+                                <p class="text-[9px] ${isExpired ? 'text-red-500' : 'text-orange-400'} uppercase font-bold">
+                                    ${isExpired ? 'Expired' : 'Expires Soon'}
+                                </p>
+                            </div>
+                            <span class="text-[9px] font-mono text-gray-500">${remaining}d</span>
+                        `;
+                        item.onclick = () => { switchTab('activity'); toggleNotificationDropdown(); };
+                        list.appendChild(item);
+                    }
+                });
+
+                if (urgentCount > 0) {
+                    badge.classList.remove('hidden');
+                    countLabel.innerText = urgentCount;
+                    emptyText.classList.add('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                    countLabel.innerText = '0';
+                    emptyText.classList.remove('hidden');
+                }
+                lucide.createIcons();
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colorClass = type === 'success' ? 'border-brand-accent' : 'border-red-500';
+            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+            const iconColor = type === 'success' ? 'text-brand-accent' : 'text-red-500';
+            
+            toast.className = `bg-brand-card border-l-4 ${colorClass} p-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right duration-300 min-w-[280px]`;
+            toast.innerHTML = `
+                <i data-lucide="${icon}" class="w-5 h-5 ${iconColor}"></i>
+                <div>
+                    <p class="text-xs font-bold text-white">${message}</p>
+                </div>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+            
+            if(type === 'success') document.getElementById('successSound').play().catch(() => {});
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
+        function updateGlobalStats(data) {
+            let totalAcc = 0;
+            let activeTasks = 0;
+            let successTotal = 0;
+            let targetTotal = 0;
+
+            data.forEach(job => {
+                const count = job.accounts ? job.accounts.length : 0;
+                totalAcc += count;
+                successTotal += count;
+                targetTotal += (job.target || 1);
+                if(job.status === 'Processing') activeTasks++;
+
+                if(lastTaskStates[job._id] === 'Processing' && job.status === 'Completed') {
+                    showToast(`Task finished!`, 'success');
+                }
+                lastTaskStates[job._id] = job.status;
+            });
+
+            document.getElementById('stat-total').innerText = totalAcc;
+            document.getElementById('stat-active').innerText = activeTasks;
+            const rate = targetTotal > 0 ? Math.round((successTotal / targetTotal) * 100) : 0;
+            document.getElementById('stat-rate').innerText = rate + '%';
+            
+            const now = new Date();
+            document.getElementById('lastSyncTime').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            document.getElementById(`nav-${tabName}`).classList.add('active');
+            if(tabName === 'activity') loadHistory();
+            if(tabName === 'domains') updateDomainStats();
+            if(tabName === 'database') updateDatabaseView();
+        }
+
+        // --- UPDATED DATABASE CENTER WITH GROUPING & PAGINATION ---
+        async function updateDatabaseView() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                const container = document.getElementById('databasePageContent');
+                const searchTerm = document.getElementById('dbSearch').value.toLowerCase();
+                
+                // 1. Grouping: Memastikan 1 link = 1 grup utuh (Tidak terpisah-pisah)
+                const grouped = data.reduce((acc, job) => {
+                    if (!job.accounts || job.accounts.length === 0) return acc;
+                    const linkKey = job.link || 'Manual Join/Bulk Task';
+                    if (!acc[linkKey]) {
+                        acc[linkKey] = {
+                            id: job._id,
+                            link: linkKey,
+                            accounts: []
+                        };
+                    }
+                    acc[linkKey].accounts = acc[linkKey].accounts.concat(job.accounts);
+                    return acc;
+                }, {});
+
+                let jobsArray = Object.values(grouped).filter(item => 
+                    item.link.toLowerCase().includes(searchTerm)
+                );
+
+                // 2. Pagination Logic
+                const totalPages = Math.ceil(jobsArray.length / dbItemsPerPage);
+                if (dbCurrentPage > totalPages) dbCurrentPage = totalPages || 1;
+                const startIdx = (dbCurrentPage - 1) * dbItemsPerPage;
+                const paginatedJobs = jobsArray.slice(startIdx, startIdx + dbItemsPerPage);
+
+                if (jobsArray.length === 0) {
+                    container.innerHTML = `<div class="bg-brand-card p-20 text-center rounded-2xl border border-dashed border-brand-border text-gray-600 uppercase text-[10px] font-bold tracking-widest">Database is empty.</div>`;
+                    return;
+                }
+
+                let htmlContent = paginatedJobs.map(job => `
+                    <div class="bg-brand-card rounded-2xl border border-brand-border overflow-hidden shadow-lg mb-6 transition hover:border-brand-primary/50">
+                        <div class="p-4 bg-white/5 border-b border-brand-border flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div class="flex items-center gap-3 flex-1 w-full">
+                                <div class="p-2 bg-blue-500/10 rounded-lg text-brand-primary"><i data-lucide="link" class="w-4 h-4"></i></div>
+                                <input type="text" value="${job.link}" 
+                                    onchange="updateJobLink('${job.id}', this.value)"
+                                    class="bg-transparent border-b border-transparent focus:border-brand-primary outline-none text-sm font-bold text-gray-200 w-full transition">
+                            </div>
+                            <div class="flex gap-2 w-full md:w-auto">
+                                <textarea id="hidden-copy-${job.id}" class="hidden">${job.accounts.map(a => `${a.email}:${a.password}`).join('\n')}</textarea>
+                                <button onclick="copyGroupedAccountsDirect('${job.id}')" class="flex-1 md:flex-none bg-brand-primary px-4 py-2 rounded-lg text-[10px] font-bold text-white hover:bg-blue-600 transition">COPY ${job.accounts.length} ACC</button>
+                                <button onclick="deleteJobPermanently('${job.id}')" class="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            ${job.accounts.map((acc, index) => `
+                                <div class="bg-brand-dark/50 p-4 rounded-xl border border-white/5 space-y-3">
+                                    <div>
+                                        <p class="text-[9px] font-bold text-gray-500 uppercase tracking-tighter mb-1">Email & Password</p>
+                                        <input type="text" value="${acc.email}" 
+                                            onchange="saveAccountUpdate('${job.id}', ${index}, this.value, '${acc.buyer || ''}')"
+                                            class="w-full bg-transparent text-[11px] text-gray-300 font-mono outline-none border-b border-transparent focus:border-brand-primary">
+                                        <p class="text-xs text-brand-accent font-bold font-mono mt-1 select-all">${acc.password}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[9px] font-bold text-blue-500 uppercase tracking-tighter mb-1">Buyer Name (Edit Manual)</p>
+                                        <input type="text" value="${acc.buyer || ''}" 
+                                            placeholder="Input buyer name..."
+                                            onchange="saveAccountUpdate('${job.id}', ${index}, '${acc.email}', this.value)"
+                                            class="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-[10px] outline-none focus:ring-1 focus:ring-brand-primary transition">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+                // 3. PAGINATION CONTROLS
+                htmlContent += `
+                    <div class="flex items-center justify-center gap-6 py-4">
+                        <button onclick="changeDbPage(-1)" ${dbCurrentPage === 1 ? 'disabled' : ''} class="p-2.5 bg-brand-card border border-brand-border rounded-xl disabled:opacity-20 hover:bg-white/5 transition flex items-center gap-2 text-xs font-bold">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i> PREV
+                        </button>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Page ${dbCurrentPage} / ${totalPages}</span>
+                        <button onclick="changeDbPage(1)" ${dbCurrentPage >= totalPages ? 'disabled' : ''} class="p-2.5 bg-brand-card border border-brand-border rounded-xl disabled:opacity-20 hover:bg-white/5 transition flex items-center gap-2 text-xs font-bold">
+                            NEXT <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+
+                container.innerHTML = htmlContent;
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        // --- HELPER DATABASE ACTIONS ---
+        function changeDbPage(dir) {
+            dbCurrentPage += dir;
+            updateDatabaseView();
+            document.getElementById('dbSearch').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function updateJobLink(jobId, newLink) {
+            await fetch('/api/database/update-link', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ jobId, newLink }) });
+            showToast("Link updated");
+        }
+
+        async function saveAccountUpdate(jobId, emailIndex, newEmail, buyerName) {
+            const res = await fetch('/api/database/update-account', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ jobId, emailIndex, newEmail, buyerName }) });
+            if(res.ok) showToast("Database updated");
+        }
+
+        async function deleteJobPermanently(jobId) {
+            if(!confirm("Hapus seluruh grup data ini secara permanen dari database?")) return;
+            const res = await fetch(`/api/database/delete/${jobId}`, { method: 'DELETE' });
+            if(res.ok) { showToast("Deleted permanently", "error"); updateDatabaseView(); }
+        }
+
+        async function copyGroupedAccountsDirect(jobId) {
+            const text = document.getElementById(`hidden-copy-${jobId}`).value;
+            await navigator.clipboard.writeText(text);
+            showToast("Copied Group!");
+        }
+
+        async function updateDomainStats() {
+            try {
+                const res = await fetch('/api/domains');
+                const domains = await res.json();
+                document.getElementById('domainCount').innerText = domains.length;
+                const listContainer = document.getElementById('domainPageList');
+                if (domains.length === 0) {
+                    listContainer.innerHTML = `<p class="col-span-full text-center py-20 text-gray-600 italic">No domains registered.</p>`;
+                    return;
+                }
+                listContainer.innerHTML = domains.map(dom => `
+                    <div class="flex items-center justify-between bg-brand-dark p-4 rounded-xl border border-brand-border group hover:border-brand-primary transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-2 h-2 rounded-full bg-brand-accent animate-pulse"></div>
+                            <span class="text-sm font-mono text-gray-300">${dom}</span>
+                        </div>
+                        <button onclick="removeDomain('${dom}')" class="text-gray-600 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                updateGlobalStats(data);
+                updateExpiryNotifications(data);
+                
+                const container = document.getElementById('historyList');
+                if (data.length === 0) {
+                    container.innerHTML = `<div class="text-center py-20 text-gray-600 border border-brand-border border-dashed rounded-2xl bg-brand-card uppercase text-[10px] font-bold tracking-widest italic">No tasks found.</div>`;
+                    return;
+                }
+                container.innerHTML = data.map(job => {
+                    const successCount = job.accounts ? job.accounts.length : 0;
+                    const totalTarget = job.target || 1;
+                    const percentage = (job.type === 'CapCut Join' || job.type === 'CapCut Bulk') ? Math.round(((successCount + (job.failed || 0)) / totalTarget) * 100) : Math.round(((successCount + (job.failed || 0)) / totalTarget) * 100);
+                    const isProcessing = job.status === 'Processing';
+                    const isExpanded = expandedTasks.has(job._id);
+                    const remaining = getRemainingDays(job.timestamp);
+                    const isCapcut = job.type && job.type.includes('CapCut');
+                    
+                    return `
+                        <div class="bg-brand-card border border-brand-border rounded-xl overflow-hidden shadow-lg ${isProcessing ? 'processing-card' : ''}">
+                            <div onclick="toggleTaskDetail('${job._id}')" class="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="chevron-right" id="icon-${job._id}" class="w-4 h-4 transition-transform" style="${isExpanded ? 'transform: rotate(90deg)' : ''}"></i>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <p class="text-[10px] font-mono text-gray-500">${new Date(job.timestamp).toLocaleString()}</p>
+                                            ${isCapcut ? `<span class="text-[8px] bg-brand-primary/20 text-brand-primary px-1 py-0.5 rounded font-bold uppercase">${job.type}</span>` : ''}
+                                            ${remaining <= 1 && !isCapcut ? `<span class="text-[8px] bg-red-500/20 text-red-500 px-1 py-0.5 rounded font-bold animate-pulse">EXPIRING</span>` : ''}
+                                        </div>
+                                        <p class="text-xs font-mono text-white truncate w-48 md:w-96">${isCapcut ? (job.email || job.link || 'Bulk Job') : job.link}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4 text-right">
+                                    <div class="hidden md:block">
+                                        <p class="text-[9px] text-gray-500 uppercase">Success</p>
+                                        <p class="text-xs font-bold text-brand-accent">${successCount}/${totalTarget}</p>
+                                    </div>
+                                    <span class="px-3 py-1 bg-brand-dark rounded-md text-[9px] font-bold ${isProcessing ? 'text-brand-primary' : 'text-gray-500'} border border-brand-border">${job.status}</span>
+                                </div>
+                            </div>
+                            <div id="detail-${job._id}" class="${isExpanded ? '' : 'hidden'} p-5 bg-brand-dark/20 border-t border-brand-border">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <p class="text-[10px] text-gray-500 uppercase mb-2">Status Log</p>
+                                            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+                                                <div class="h-full bg-brand-primary transition-all duration-500" style="width: ${percentage}%"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="terminal-mini custom-scrollbar">
+                                            <div class="terminal-line">${isCapcut ? 'CapCut automated join sequence...' : 'Task initialized...'}</div>
+                                            <div class="terminal-line">Log: ${job.log || 'Waiting for update...'}</div>
+                                            ${isProcessing ? `<div class="terminal-line text-white animate-pulse">Running process... ${percentage}%</div>` : `<div class="terminal-line text-brand-accent font-bold italic">PROCESS ENDED.</div>`}
+                                        </div>
+
+                                        <div class="flex gap-2">
+                                            ${!isCapcut ? `<a href="/api/download/${job._id}" class="flex-1 bg-brand-dark border border-brand-border text-[10px] font-bold py-2 rounded text-center hover:bg-brand-border transition">EXPORT CSV</a>` : ''}
+                                            <button onclick="deleteHistory('${job._id}')" class="px-3 py-2 text-red-500 border border-brand-border rounded hover:bg-red-500/10 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-1.5 max-h-[180px] overflow-y-auto custom-scrollbar p-2 bg-black/20 rounded-lg">
+                                         <p class="text-[10px] text-gray-500 uppercase mb-2">${isCapcut ? 'Accounts Status' : 'Captured Accounts'}</p>
+                                         ${isCapcut ? 
+                                            (job.accounts?.length > 0 ? job.accounts.map(acc => `<div class="text-[9px] font-mono p-2 bg-brand-dark border-b border-white/5 flex justify-between"><span>${acc.email}</span><span class="text-brand-accent">${acc.status}</span></div>`).join('') : `<div class="text-[9px] font-mono p-2 bg-brand-dark border-b border-white/5 flex flex-col gap-1"><span class="text-gray-400">EMAIL: ${job.email || 'Bulk Job'}</span><span class="text-brand-accent">LOG: ${job.log}</span></div>`) : 
+                                            (job.accounts?.map(acc => `<div class="text-[9px] font-mono p-2 bg-brand-dark border-b border-white/5 flex justify-between"><span>${acc.email}</span><span class="text-brand-accent font-bold">${acc.password}</span></div>`).join('') || '<p class="text-[10px] text-gray-600 italic">No accounts yet...</p>')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                lucide.createIcons();
+            } catch (e) { console.error(e); }
+        }
+
+        async function startCapcutJoin() {
+            const btn = document.getElementById('capcutBtn');
+            const email = document.getElementById('capcut-email').value;
+            const password = document.getElementById('capcut-password').value;
+            const inviteLink = document.getElementById('capcut-invite-single').value;
+
+            if (!email || !password || !inviteLink) { showToast("Please fill all fields!", "error"); return; }
+            btn.disabled = true; btn.innerText = 'STARTING...';
+
+            try {
+                const res = await fetch('/api/capcut/join', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password, inviteLink })
+                });
+                if (res.ok) {
+                    showToast("Single Join Started!", "success");
+                    document.getElementById('capcut-email').value = '';
+                    document.getElementById('capcut-password').value = '';
+                    switchTab('activity');
+                } else {
+                    const err = await res.json();
+                    showToast(err.msg || "Failed", "error");
+                }
+            } catch (e) { showToast("Network Error", "error"); }
+            finally { btn.disabled = false; btn.innerText = 'START JOIN PROCESS'; }
+        }
+
+        async function startCapcutBulk() {
+            const btn = document.getElementById('capcutBulkBtn');
+            const bulkData = document.getElementById('capcut-bulk-data').value;
+            const inviteLink = document.getElementById('capcut-invite-bulk').value;
+
+            if (!bulkData || !inviteLink) { showToast("Accounts and Link required!", "error"); return; }
+            btn.disabled = true; btn.innerText = 'PROCESSING BULK...';
+
+            try {
+                const res = await fetch('/api/capcut/bulk-join', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ bulkData, inviteLink })
+                });
+                if (res.ok) {
+                    showToast("Bulk Join Process Started!", "success");
+                    document.getElementById('capcut-bulk-data').value = '';
+                    switchTab('activity');
+                } else {
+                    const err = await res.json();
+                    showToast(err.msg || "Bulk failed", "error");
+                }
+            } catch (e) { showToast("Network Error", "error"); }
+            finally { btn.disabled = false; btn.innerText = 'RUN BULK JOINER'; }
+        }
+
+        async function startCheckDuration() {
+            const btn = document.getElementById('checkSubBtn');
+            const email = document.getElementById('check-email').value;
+            const password = document.getElementById('check-password').value;
+
+            if (!email || !password) { showToast("Email and Password required!", "error"); return; }
+            btn.disabled = true; btn.innerText = 'CHECKING...';
+
+            try {
+                const res = await fetch('/api/capcut/check-sub', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ email, password })
+                });
+                if (res.ok) {
+                    showToast("Check Subscription Started!", "success");
+                    switchTab('activity');
+                } else {
+                    const err = await res.json();
+                    showToast(err.msg || "Failed", "error");
+                }
+            } catch (e) { showToast("Error connecting to server", "error"); }
+            finally { btn.disabled = false; btn.innerText = 'CHECK SUBSCRIPTION'; }
+        }
+
+        function toggleTaskDetail(id) {
+            const detail = document.getElementById(`detail-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            if (detail.classList.contains('hidden')) {
+                detail.classList.remove('hidden');
+                icon.style.transform = 'rotate(90deg)';
+                expandedTasks.add(id);
+                const term = detail.querySelector('.terminal-mini');
+                if(term) term.scrollTop = term.scrollHeight;
+            } else {
+                detail.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+                expandedTasks.delete(id);
+            }
+        }
+
+        async function startJob() {
+            const btn = document.getElementById('launchBtn');
+            const link = document.getElementById('link').value;
+            const count = document.getElementById('count').value;
+            const password = document.getElementById('pw').value;
+            if (!link.includes('capcut.com')) { showToast('Invalid CapCut Link!', 'error'); return; }
+            
+            btn.disabled = true;
+            btn.innerText = 'LAUNCHING...';
+            try {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ link, count, password })
+                });
+                if(res.ok) { 
+                    showToast("Task Started Successfully!", "success");
+                    setTimeout(() => { 
+                        btn.disabled = false; btn.innerText = 'LAUNCH TASK'; 
+                        switchTab('activity');
+                    }, 1000); 
+                } else {
+                    showToast("Failed to start", "error");
+                    btn.disabled = false; btn.innerText = 'LAUNCH TASK';
+                }
+            } catch (e) { 
+                showToast("Connection Error", "error");
+                btn.disabled = false; btn.innerText = 'LAUNCH TASK'; 
+            }
+        }
+
+        async function addDomain() {
+            const input = document.getElementById('newDomain');
+            if(!input.value) return;
+            await fetch('/api/domains', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ domain: input.value })
+            });
+            input.value = '';
+            showToast("Domain added");
+            updateDomainStats();
+        }
+
+        async function removeDomain(dom) {
+            if(!confirm('Delete?')) return;
+            await fetch('/api/domains', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ domain: dom })
+            });
+            showToast("Domain removed", "error");
+            updateDomainStats();
+        }
+
+        async function deleteHistory(id) {
+            if(!confirm('Delete this task?')) return;
+            await fetch(`/api/history/${id}`, { method: 'DELETE' });
+            showToast("Task deleted");
+            loadHistory();
+        }
+
+        setInterval(loadHistory, 2000);
+        loadHistory();
+        updateDomainStats();
+    </script>
+</body>
+</html>
